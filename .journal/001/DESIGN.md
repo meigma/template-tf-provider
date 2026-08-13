@@ -85,11 +85,19 @@ source tree. We use **one tree**:
   read the repo), never hand-edited, and CI fails if regeneration produces a
   diff.
 - Diátaxis content (D5) lives beside it: `docs/tutorials/`, `docs/how-to/`,
-  `docs/explanation/`. Registries ignore paths they don't know; mkdocs nav
-  includes everything, presenting the generated pages as its Reference
-  section. (Verify registry tolerance of extra dirs during implementation;
-  fallback is moving Diátaxis content under `docs/guides/`, which registries
-  render.)
+  `docs/explanation/`. **Verified safe** (Phase 4 research): both registries
+  use allowlist ingestion and ignore unknown `docs/` subdirectories —
+  confirmed in tfplugindocs v0.25.0 source (non-matching dirs are "valid
+  non-documentation directories"), by running the validator against a
+  Diátaxis fixture (exit 0), and by ~12 published providers including
+  HashiCorp's own terraform-provider-tfe (`docs/stylesheets/extra.css`).
+  Three constraints hold: never nest inside a recognized dir
+  (`docs/resources/<subdir>/` is a hard validation error), Diátaxis content
+  is repo/mkdocs-only (registries won't render it; registry-visible prose
+  belongs in `docs/guides/` with `page_title`), and never add
+  `website/docs/` (triggers HashiCorp's mixed-layout error and makes
+  OpenTofu ignore `docs/` entirely). `tfplugindocs validate` passes on this
+  layout and acts as the CI guardrail.
 - `mkdocs.yml` at repo root, mkdocs + material pinned via uv/python from
   mise. Site deploys to GitHub Pages from a moon task in CI on merges to the
   default branch.
@@ -221,8 +229,9 @@ terraform-provider-example/
 
 ## Open questions
 
-1. Registry rendering of unknown `docs/` subdirectories — assumed ignored;
-   verify early, fallback in D3.
+None remaining. The last one (registry rendering of unknown `docs/`
+subdirectories) was resolved during Phase 4 — see D3 for the finding and
+constraints.
 
 ## References
 
