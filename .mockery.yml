@@ -1,0 +1,20 @@
+# mockery: generates the test doubles for this repository's ports.
+#
+# Mocks are generated, never hand-written, and are checked in so `go test` works
+# without running a code generator first. Regenerate after changing a port:
+#
+#   mise exec -- mockery
+#
+# Each mock lands in a `mocks` subpackage beside the port it stands in for, so
+# internal/core's Store becomes internal/core/mocks.Store.
+template: testify
+
+dir: '{{.InterfaceDir}}/mocks'
+pkgname: 'mocks'
+filename: '{{.InterfaceName | snakecase}}.go'
+structname: '{{.InterfaceName}}'
+
+packages:
+  github.com/meigma/terraform-provider-example/internal/core:
+    interfaces:
+      Store:
