@@ -21,3 +21,6 @@ Wrote DESIGN.md in this session folder: scaffolding-framework as base, hexagonal
 
 ## 2026-08-12 16:58 — Design feedback round 1
 User decisions: bootstrap follows template-go's DELETE_ME.md agent-facing checklist (now D8); GPG provisioning gets a helper script that generates the key and pushes secrets via `gh secret set` (folded into D6). Open questions trimmed to two: registry tolerance of extra docs/ dirs, and testacc CI cadence (explained to user, awaiting their call).
+
+## 2026-08-12 17:05 — Acceptance test cadence decided
+User decision: acceptance tests never run automatically. testacc is excluded from moon ci and shipped as a workflow_dispatch-only GitHub Actions workflow; shipping "technically broken" until the real provider exists is fine since nothing triggers it. Design doc updated (D4); only remaining open question is registry tolerance of extra docs/ dirs.

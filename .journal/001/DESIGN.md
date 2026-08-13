@@ -110,16 +110,20 @@ moon tasks (root project):
 - `docs-gen` — run `tfplugindocs generate`; `docs-check` — regen + fail on
   git diff (CI gate).
 - `docs-site` — `mkdocs build --strict`; a deploy task publishes to Pages.
-- `testacc` — acceptance tests with `TF_ACC=1`, `runInCI` on demand or
-  nightly, not on every PR (they're slow and may need credentials in real
-  providers; the template's example provider keeps them hermetic so they can
-  run in PR CI until a real upstream appears).
+- `testacc` — acceptance tests with `TF_ACC=1`. Never runs automatically:
+  excluded from `moon ci` (`runInCI: false`) and exposed only through a
+  dedicated `workflow_dispatch`-triggered GitHub Actions workflow. Real
+  providers need credentials, create real infrastructure, and cost money;
+  manual-only means the template can ship the workflow wired up even while
+  the generated project's provider is unimplemented — it simply isn't run
+  until someone triggers it.
 - CI is `moon ci` behind `jdx/mise-action` (locked, `cache: true` in CI,
   `cache: false` in release workflows), matching template-go's `ci.yml`.
 
 Acceptance tests run against **OpenTofu by default** (via
-`TF_ACC_TERRAFORM_PATH` pointing at the mise-pinned `tofu`), with a CI matrix
-leg for the mise-pinned `terraform` binary so both ecosystems stay verified.
+`TF_ACC_TERRAFORM_PATH` pointing at the mise-pinned `tofu`); the manual
+workflow offers a matrix leg for the mise-pinned `terraform` binary so both
+ecosystems can be verified from the same trigger.
 
 ### D5 — Release flow: release-please orchestrates, tag-triggered publish
 
@@ -219,9 +223,6 @@ terraform-provider-example/
 
 1. Registry rendering of unknown `docs/` subdirectories — assumed ignored;
    verify early, fallback in D3.
-2. Whether the example provider's acceptance tests stay in PR CI permanently
-   or move to nightly once a real upstream (with credentials) exists — the
-   template should make the switch a one-line moon task change.
 
 ## References
 
