@@ -195,13 +195,16 @@ main() {
 	local public_key
 	public_key="$(gpg --armor --export "$fingerprint")"
 
+	# Pipe the value in with no --body flag at all: gh reads the secret from
+	# stdin only when --body is absent. `--body -` does NOT mean stdin, it
+	# stores the literal string "-".
 	log "Setting $SECRET_KEY_NAME on $repo"
 	printf '%s' "$private_key" |
-		gh secret set "$SECRET_KEY_NAME" --repo "$repo" --body -
+		gh secret set "$SECRET_KEY_NAME" --repo "$repo"
 
 	log "Setting $SECRET_PASSPHRASE_NAME on $repo"
 	printf '%s' "$passphrase" |
-		gh secret set "$SECRET_PASSPHRASE_NAME" --repo "$repo" --body -
+		gh secret set "$SECRET_PASSPHRASE_NAME" --repo "$repo"
 
 	log ""
 	log "Done. The private key exists only in $repo's Actions secrets now;"
