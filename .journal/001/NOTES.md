@@ -15,3 +15,6 @@ User asked three questions ahead of writing a design doc. Findings:
 - OpenTofu: separate registry (github.com/opentofu/registry). Submission = GitHub issue from a template; automation validates and opens a PR; maintainers merge. Anyone can submit, not just the author. GPG key submission requires public org membership + separate issue. Same repo naming convention.
 - Private/local use: dev_overrides, filesystem_mirror (packed/unpacked layouts), network_mirror protocol, implied plugin dirs (~/.terraform.d/plugins), or a private registry implementing the provider registry protocol.
 Next: write small design doc in .journal/001/.
+
+## 2026-08-12 16:48 — Design doc drafted
+Wrote DESIGN.md in this session folder: scaffolding-framework as base, hexagonal internal/{provider,core,client} split, single docs/ tree shared by registries + mkdocs, mise/moon tooling, release-please -> draft release -> tag-triggered GoReleaser publish with GPG (registry contract) + cosign/SBOM/attest on top, flip draft->public last. Open questions recorded (registry tolerance of extra docs dirs, rename script, GPG provisioning, testacc cadence).
