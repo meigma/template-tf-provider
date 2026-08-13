@@ -62,6 +62,11 @@ workspace:
     include: []
 
 tasks:
+  # format and lint are two golangci-lint invocations sharing one cache
+  # directory that moon cannot see, so they take a mutex rather than running
+  # side by side. Run concurrently under `check`, golangci-lint intermittently
+  # exits 3 (failed to run, not "issues found") — roughly once in thirty runs
+  # on this machine, and never when either runs alone.
   format:
     command: 'golangci-lint fmt --config .golangci.yml --diff'
     inputs:
@@ -69,6 +74,7 @@ tasks:
       - '@group(lintConfig)'
     options:
       cache: false
+      mutex: 'golangci-lint'
 
   lint:
     command: 'golangci-lint run --config .golangci.yml ./... --show-stats=false'
@@ -77,6 +83,7 @@ tasks:
       - '@group(lintConfig)'
     options:
       cache: false
+      mutex: 'golangci-lint'
 
   build:
     command: 'go build -o bin/terraform-provider-example .'
