@@ -1,10 +1,16 @@
-# This workflow rehearses the release path without uploading GitHub release
-# assets. It is intended for release PRs and manual checks before changing
-# release automation.
+# Rehearsal for release.yml. It runs the same GoReleaser configuration, with the
+# same GPG key, over a synthetic version, and asserts the full registry contract
+# — then throws the artifacts away. Nothing is uploaded, published, or signed
+# into a public transparency log.
 #
-# Keep the pull_request trigger broad so required check contexts still report
-# on normal PRs. The job intentionally skips unless the PR head branch is a
-# Release Please branch, which avoids spending runner time on routine changes.
+# The point is that the first time the release path runs for real should not be
+# the first time it runs at all. Two things are deliberately NOT rehearsed:
+# cosign signing (it would put fake versions in Rekor forever) and the upload
+# and draft-publication steps (they need a release object that does not exist).
+#
+# Keep the pull_request trigger broad so required check contexts still report on
+# normal PRs. The job intentionally skips unless the PR head branch is a Release
+# Please branch, which avoids spending runner time on routine changes.
 
 name: Release Dry Run
 
@@ -23,6 +29,11 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
+    env:
+      # Never auto-download a Go toolchain other than the mise-pinned one
+      # (mise [env] is not carried by the action's shims, so set it on the job).
+      GOTOOLCHAIN: local
+      DRY_RUN_VERSION: 0.0.0-dryrun.${{ github.run_id }}.${{ github.run_attempt }}
     steps:
       - name: Check out repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -30,89 +41,84 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+      - name: Setup mise
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
         with:
-          go-version-file: go.mod
-          cache: true
+          version: 2026.6.14
+          # Matches the real release job: publishing paths do not read caches.
+          cache: false
 
-      - name: Install Syft
-        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+      - name: Require GPG signing secrets
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+
+          # Release Please branches live in this repository, so secrets are
+          # available here. If they are missing the rehearsal is worthless: it
+          # would pass while the real release fails at the signing step.
+          if [ -z "${GPG_PRIVATE_KEY:-}" ] || [ -z "${GPG_PASSPHRASE:-}" ]; then
+            echo "GPG_PRIVATE_KEY and GPG_PASSPHRASE are not set on this repository." >&2
+            echo "The release cannot sign SHA256SUMS without them, and this rehearsal" >&2
+            echo "refuses to report success on a path the real release cannot take." >&2
+            echo "Run scripts/gpg-provision.sh to create the signing key and secrets." >&2
+            exit 1
+          fi
+
+      - name: Import GPG signing key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+
+          printf '%s' "$GPG_PRIVATE_KEY" |
+            gpg --batch --quiet --pinentry-mode loopback \
+              --passphrase "$GPG_PASSPHRASE" --import
+
+          fingerprint="$(gpg --list-secret-keys --with-colons |
+            awk -F: '/^fpr:/ { print $10; exit }')"
+
+          if [ -z "$fingerprint" ]; then
+            echo "No secret key present after import; is GPG_PRIVATE_KEY the armored private key?" >&2
+            exit 1
+          fi
+
+          echo "Imported signing key $fingerprint"
+          echo "GPG_FINGERPRINT=$fingerprint" >> "$GITHUB_ENV"
 
       - name: Create synthetic release tag
-        env:
-          DRY_RUN_TAG: v0.0.0-dryrun.${{ github.run_id }}.${{ github.run_attempt }}
-        run: |
-          git tag -f "$DRY_RUN_TAG"
-
-      - name: Run GoReleaser without publishing
-        uses: goreleaser/goreleaser-action@5daf1e915a5f0af01ddbcd89a43b8061ff4f1a89 # v7.2.2
-        with:
-          distribution: goreleaser
-          version: '~> v2'
-          args: release --clean --skip=publish
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          GORELEASER_CURRENT_TAG: v0.0.0-dryrun.${{ github.run_id }}.${{ github.run_attempt }}
-
-      - name: Validate dry-run artifacts
         run: |
           set -euo pipefail
 
-          version="0.0.0-dryrun.${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
-          binary_name="terraform-provider-example"
-          asset_prefix="${binary_name}_"
+          # Local only, never pushed. -c tag.gpgSign=false keeps a signing key in
+          # the runner's keyring from turning this into a signed-tag prompt.
+          git -c tag.gpgSign=false tag -f "v${DRY_RUN_VERSION}"
 
-          jq -e '.metadata.protocol_versions == ["6.0"]' terraform-registry-manifest.json >/dev/null
-
-          jq -e --arg asset_prefix "$asset_prefix" '
-            [
-              .[]
-              | select(
-                  (.type == "Binary" and (.name | startswith($asset_prefix))) or
-                  (.type == "SBOM" and (.name | startswith($asset_prefix))) or
-                  (.type == "Checksum" and .name == "checksums.txt")
-                )
-            ] as $artifacts
-            | ($artifacts | map(select(.type == "Binary")) | length) == 4
-            and ($artifacts | map(select(.type == "SBOM")) | length) == 4
-            and ($artifacts | map(select(.type == "Checksum")) | length) == 1
-          ' dist/artifacts.json
-
-          test -f dist/checksums.txt
-
-          for os in darwin linux; do
-            for arch in amd64 arm64; do
-              expected="${binary_name}_${version}_${os}_${arch}"
-              expected_sbom="${expected}.sbom.json"
-
-              jq -e --arg name "$expected" '.[] | select(.type == "Binary" and .name == $name)' dist/artifacts.json >/dev/null
-              jq -e --arg name "$expected_sbom" '.[] | select(.type == "SBOM" and .name == $name)' dist/artifacts.json >/dev/null
-              awk -v name="$expected" '$2 == name && length($1) == 64 && $1 ~ /^[[:xdigit:]]+$/ { found = 1 } END { exit(found ? 0 : 1) }' dist/checksums.txt
-            done
-          done
-
-      - name: Smoke test dry-run binary
+      - name: Build and sign release artifacts
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
 
-          version="0.0.0-dryrun.${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
-          binary_name="terraform-provider-example"
-          host_os="$(go env GOHOSTOS)"
-          host_arch="$(go env GOHOSTARCH)"
-          expected="${binary_name}_${version}_${host_os}_${host_arch}"
-          bin="$(jq -r --arg name "$expected" '.[] | select(.type == "Binary" and .name == $name) | .path' dist/artifacts.json)"
+          GORELEASER_CURRENT_TAG="v${DRY_RUN_VERSION}" \
+            goreleaser release --clean --skip=publish
 
-          if [ -z "$bin" ] || [ "$bin" = "null" ] || [ ! -f "$bin" ]; then
-            echo "failed to locate host binary artifact $expected" >&2
-            jq . dist/artifacts.json >&2
-            exit 1
-          fi
+      - name: Stage registry contract assets
+        run: ./scripts/stage-release-assets.sh --version "$DRY_RUN_VERSION"
 
-          # A provider binary is a plugin. Run outside Terraform it must refuse
-          # to start rather than serve gRPC on the shell's stdio.
-          if output="$("$bin" 2>&1)"; then
-            echo "provider binary unexpectedly succeeded when run directly" >&2
-            exit 1
-          fi
-          printf '%s\n' "$output"
+      - name: Check registry contract
+        run: ./scripts/check-release-contract.sh --version "$DRY_RUN_VERSION" --gpg-verify
+
+      - name: Smoke test the release binary
+        run: ./scripts/smoke-test-provider.sh --version "$DRY_RUN_VERSION"
+
+      - name: Summarize the rehearsal
+        run: |
+          {
+            echo "## Release rehearsal passed"
+            echo
+            echo "Built, signed, and contract-checked \`$DRY_RUN_VERSION\`."
+            echo "No artifact left this runner."
+          } >> "$GITHUB_STEP_SUMMARY"

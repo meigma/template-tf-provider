@@ -43,9 +43,16 @@ python = "3.14.3"
 
 # Build / CI / release / supply-chain CLIs. moon itself is now mise-managed (CI
 # installs it via mise instead of moonrepo/setup-toolchain). cosign backs the
-# signing/verification steps in the release workflow.
-"aqua:moonrepo/moon"   = "2.3.5"
-"aqua:sigstore/cosign" = "3.1.1"
+# signing/verification steps in the release workflow, and goreleaser builds the
+# registry-shaped release artifacts (zips, SHA256SUMS, GPG signature, SBOMs) so
+# `goreleaser check` / `--snapshot` rehearsals run the same version CI does.
+"aqua:moonrepo/moon"         = "2.3.5"
+"aqua:sigstore/cosign"       = "3.1.1"
+"aqua:goreleaser/goreleaser" = "2.17.1"
+# syft is what GoReleaser shells out to for the per-zip SBOMs. Pinning it here
+# rather than downloading it in the workflow keeps the release path on tools
+# whose checksums mise.lock records.
+"aqua:anchore/syft"          = "1.51.0"
 
 [env]
 # Pin the Go toolchain: never auto-download a toolchain other than the one above.

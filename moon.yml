@@ -35,12 +35,19 @@ fileGroups:
     - '.golangci.yml'
     - 'mise.toml'
     - 'mise.lock'
+  # Everything that decides the shape of a release, including the shell that
+  # stages and validates the registry contract: a change to any of it can change
+  # what consumers install.
   releaseConfig:
     - '.goreleaser.yaml'
     - 'terraform-registry-manifest.json'
     - 'release-please-config.json'
     - '.release-please-manifest.json'
-    - '.github/workflows.disabled/**/*.yml'
+    - '.github/workflows/release.yml'
+    - '.github/workflows/release-dry-run.yml'
+    - '.github/workflows/release-please.yml'
+    - '.github/workflows/attest.yml'
+    - 'scripts/*.sh'
   # What tfplugindocs reads: the templates it renders and the example
   # configurations it embeds. The provider schema is the third input and comes
   # from @group(goSources).
