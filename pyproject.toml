@@ -9,3 +9,15 @@ dependencies = [
 
 [tool.uv]
 package = false
+
+# Quarantine brand-new releases for a week, so a compromised upload has to
+# survive a cooldown before it can enter the lock. uv stores this as a relative
+# span (`exclude-newer-span = "-P7D"`), not a frozen date, so it does not rot.
+#
+# It only affects resolution, meaning `uv lock`. CI runs `uv sync --locked` and
+# `uv run --locked` and never re-resolves, so the window cannot hold back a
+# build. To take a security fix that is younger than the window, bypass it for
+# that package alone rather than removing this line:
+#
+#   uv lock --upgrade-package NAME --exclude-newer-package NAME=<RFC 3339 date>
+exclude-newer = "7 days ago"
