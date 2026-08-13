@@ -159,6 +159,11 @@ long-lived key material. Constraints:
   secrets gated to the publish workflow's environment; public key is
   registered in the HashiCorp registry org and submitted to OpenTofu's
   registry.
+- A helper script (`scripts/gpg-provision.sh` or similar) generates the key
+  and pushes the private key + passphrase to GitHub Actions secrets via
+  `gh secret set`, then prints the ASCII-armored public key with pointers to
+  the two registry registration steps. Provisioning is one command instead
+  of a manual GPG ceremony.
 - The GPG key signs exactly one thing: `SHA256SUMS`. Everything else —
   cosign bundles, SBOMs, provenance — uses keyless/OIDC with short-lived
   credentials, so consumers who can do better than GPG get digest-based
@@ -173,7 +178,20 @@ long-lived key material. Constraints:
 Publishing to each registry has one-time manual steps (HashiCorp publish
 flow; OpenTofu submission issue + GPG key issue). The template ships a
 Diátaxis how-to (`docs/how-to/publish.md` or README section) walking through
-both, rather than trying to automate registry onboarding.
+both, rather than trying to automate registry onboarding. Key generation and
+secret upload are the exception, handled by the D6 helper script.
+
+### D8 — Bootstrap follows template-go's DELETE_ME.md pattern
+
+The template ships a `DELETE_ME.md` aimed at agents and first-time owners,
+mirroring template-go's: what the template provides, how the pieces fit, and
+a first-setup checklist — rename the module and provider
+(`terraform-provider-scaffolding` → `terraform-provider-{name}`), a
+placeholder `rg` sweep, files to update (`.goreleaser.yml`,
+`release-please-config.json`, `mkdocs.yml`, workflows,
+`terraform-registry-manifest.json`), the GPG provisioning script, registry
+onboarding pointers, the full local check, and finally deleting the file
+itself. No bootstrap automation beyond that checklist plus the D6 script.
 
 ## Repository layout (target)
 
@@ -184,7 +202,9 @@ terraform-provider-example/
 ├── docs/                     # registry docs (generated) + Diátaxis content
 ├── examples/                 # tf configs feeding tfplugindocs + registry
 ├── internal/{provider,core,client}/
+├── scripts/                  # gpg-provision.sh
 ├── templates/                # tfplugindocs templates
+├── DELETE_ME.md              # agent-facing first-setup checklist (D8)
 ├── main.go                   # provider server entrypoint
 ├── terraform-registry-manifest.json
 ├── mise.toml / mise.lock
@@ -199,12 +219,7 @@ terraform-provider-example/
 
 1. Registry rendering of unknown `docs/` subdirectories — assumed ignored;
    verify early, fallback in D3.
-2. Template ergonomics: how much renaming (`scaffolding` → real name) do we
-   script (e.g. a bootstrap task) vs. document? scaffolding-framework
-   documents; a small rename script would fit Meigma's template-go pattern.
-3. GPG key provisioning: per-repo key generation is manual today; decide
-   whether to write a how-to only or a helper script.
-4. Whether the example provider's acceptance tests stay in PR CI permanently
+2. Whether the example provider's acceptance tests stay in PR CI permanently
    or move to nightly once a real upstream (with credentials) exists — the
    template should make the switch a one-line moon task change.
 

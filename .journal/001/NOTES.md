@@ -18,3 +18,6 @@ Next: write small design doc in .journal/001/.
 
 ## 2026-08-12 16:48 — Design doc drafted
 Wrote DESIGN.md in this session folder: scaffolding-framework as base, hexagonal internal/{provider,core,client} split, single docs/ tree shared by registries + mkdocs, mise/moon tooling, release-please -> draft release -> tag-triggered GoReleaser publish with GPG (registry contract) + cosign/SBOM/attest on top, flip draft->public last. Open questions recorded (registry tolerance of extra docs dirs, rename script, GPG provisioning, testacc cadence).
+
+## 2026-08-12 16:58 — Design feedback round 1
+User decisions: bootstrap follows template-go's DELETE_ME.md agent-facing checklist (now D8); GPG provisioning gets a helper script that generates the key and pushes secrets via `gh secret set` (folded into D6). Open questions trimmed to two: registry tolerance of extra docs/ dirs, and testacc CI cadence (explained to user, awaiting their call).
