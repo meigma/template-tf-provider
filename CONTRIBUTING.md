@@ -1,7 +1,7 @@
 # Contributing
 
 Thank you for your interest in contributing.
-This repository is a Go project template, so changes should keep the generated-project path simple and predictable.
+This repository is a Terraform provider template, so changes should keep the generated-project path simple and predictable.
 For private vulnerability reporting, use [SECURITY.md](SECURITY.md) instead of public channels.
 
 ## Reporting Bugs
@@ -41,8 +41,18 @@ moon run root:format
 moon run root:lint
 moon run root:build
 moon run root:test
-go run ./cmd/template-go --version
 ```
+
+The provider binary is a plugin, so running it directly only prints an error.
+To exercise it against Terraform, build it and start it in debug mode:
+
+```sh
+moon run root:build
+./bin/terraform-provider-example -debug
+```
+
+Debug mode prints a `TF_REATTACH_PROVIDERS` value. Export it in another shell
+and run `terraform plan` there to have Terraform talk to your running binary.
 
 ## Release Changes
 

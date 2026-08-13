@@ -3,8 +3,8 @@ layer: 'application'
 stack: 'backend'
 
 project:
-  title: 'template-go'
-  description: 'Meigma Go repository template.'
+  title: 'template-tf-provider'
+  description: 'Meigma Terraform provider repository template.'
   owner: 'meigma'
   maintainers:
     - 'meigma'
@@ -16,7 +16,10 @@ toolchains:
 
 fileGroups:
   goSources:
-    - 'cmd/**/*.go'
+    # Go provider convention (as in HashiCorp's scaffolding-framework) puts the
+    # main package at the repository root, so root-level *.go is a source input
+    # alongside internal/.
+    - '*.go'
     - 'internal/**/*.go'
     - 'go.mod'
     - 'go.sum'
@@ -31,7 +34,7 @@ fileGroups:
     - 'mise.lock'
   releaseConfig:
     - '.goreleaser.yaml'
-    - 'ghd.toml'
+    - 'terraform-registry-manifest.json'
     - 'release-please-config.json'
     - '.release-please-manifest.json'
     - '.github/workflows.disabled/**/*.yml'
@@ -58,11 +61,11 @@ tasks:
       cache: false
 
   build:
-    command: 'go build -o bin/template-go ./cmd/template-go'
+    command: 'go build -o bin/terraform-provider-example .'
     inputs:
       - '@group(goSources)'
     outputs:
-      - 'bin/template-go'
+      - 'bin/terraform-provider-example'
 
   test:
     command: 'go test ./...'
