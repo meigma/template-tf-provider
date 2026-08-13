@@ -1,3 +1,21 @@
+# GoReleaser builds the artifacts the Terraform and OpenTofu registries ingest.
+#
+# The registry contract is not negotiable — both registries discover a release by
+# reading its asset names. For version X.Y.Z (tag vX.Y.Z) the release must carry:
+#
+#   terraform-provider-example_X.Y.Z_<os>_<arch>.zip   one per platform, each
+#                                                      holding a single binary
+#                                                      named ..._vX.Y.Z
+#   terraform-provider-example_X.Y.Z_manifest.json     copy of the repo manifest
+#   terraform-provider-example_X.Y.Z_SHA256SUMS        covers the zips + manifest
+#   terraform-provider-example_X.Y.Z_SHA256SUMS.sig    detached BINARY GPG sig
+#
+# Note where the `v` goes: the zip name carries a bare version, the binary INSIDE
+# the zip carries `v`. Getting that backwards makes the provider un-installable.
+#
+# Everything else here (SBOMs, reproducible flags, the cosign bundle the release
+# workflow adds afterwards) is additive hardening the registries ignore.
+
 version: 2
 
 project_name: terraform-provider-example
@@ -6,25 +24,54 @@ before:
   hooks:
     - go test ./...
 
+# Verifiable builds (`gomod.proxy: true`) are deliberately NOT enabled here.
+# The pipe resolves <module>@<tag> through the Go module proxy, which fails
+# twice over for this repository:
+#
+#   1. The module path is github.com/meigma/terraform-provider-example while the
+#      repository is meigma/template-tf-provider, so the proxy cannot fetch it.
+#      A generated repository whose module path matches its own URL is fine.
+#   2. The pipe is skipped under --snapshot and has no --skip key, so the
+#      synthetic-tag rehearsal in release-dry-run.yml could never exercise it —
+#      a real release would be the first run of an unrehearsed pipe.
+#
+# Turn it on only once the module path is the repository's real, public URL, and
+# expect to rework the rehearsal at the same time.
+
 builds:
   - id: terraform-provider-example
     main: .
-    binary: terraform-provider-example
+    # Terraform unpacks the zip and executes the file whose name encodes the
+    # version; the plugin loader parses it, so `_v{{ .Version }}` is required.
+    binary: '{{ .ProjectName }}_v{{ .Version }}'
     env:
       - CGO_ENABLED=0
+    # The platform set HashiCorp's scaffolding-framework ships. Providers run
+    # wherever the CLI runs, which includes 32-bit and freebsd hosts.
     goos:
       - darwin
+      - freebsd
       - linux
+      - windows
     goarch:
       - amd64
       - arm64
+      - '386'
+      - arm
+    ignore:
+      - goos: darwin
+        goarch: '386'
+      - goos: darwin
+        goarch: arm
+      - goos: windows
+        goarch: arm
     flags:
       - -trimpath
     ldflags:
+      # -buildid= and -trimpath strip the two remaining sources of build-path and
+      # build-id nondeterminism, so two builds of one tag agree byte for byte.
       - -s -w -buildid=
       - -X main.version={{ .Version }}
-      - -X main.commit={{ .FullCommit }}
-      - -X main.date={{ .CommitDate }}
     mod_timestamp: '{{ .CommitTimestamp }}'
 
 archives:
@@ -32,19 +79,53 @@ archives:
     ids:
       - terraform-provider-example
     formats:
-      - binary
-    name_template: >-
-      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
-
-checksum:
-  name_template: checksums.txt
+      - zip
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    # A provider zip holds exactly one file: the binary. `none*` matches nothing
+    # and is GoReleaser's documented way to drop the default LICENSE/README set.
+    files:
+      - none*
 
 sboms:
-  - id: binary
-    artifacts: binary
+  - id: archive
+    artifacts: archive
+
+checksum:
+  name_template: '{{ .ProjectName }}_{{ .Version }}_SHA256SUMS'
+  algorithm: sha256
+  # The registries fetch the manifest as a release asset and verify it against
+  # this file, so the manifest has to be checksummed alongside the zips.
+  extra_files:
+    - glob: terraform-registry-manifest.json
+      name_template: '{{ .ProjectName }}_{{ .Version }}_manifest.json'
+
+signs:
+  - id: sha256sums
+    artifacts: checksum
+    signature: '${artifact}.sig'
+    # Headless signing: loopback pinentry plus the passphrase on stdin means no
+    # gpg-agent tty and no passphrase on the command line (argv is world
+    # readable). Omitting --armor is deliberate — the registries reject an
+    # ASCII-armored signature.
+    stdin: '{{ .Env.GPG_PASSPHRASE }}'
+    args:
+      - --batch
+      - --pinentry-mode
+      - loopback
+      - --passphrase-fd
+      - '0'
+      - --local-user
+      - '{{ .Env.GPG_FINGERPRINT }}'
+      - --output
+      - '${signature}'
+      - --detach-sign
+      - '${artifact}'
 
 changelog:
   disable: true
 
 release:
+  # Release Please owns the release object (it creates the draft), and the
+  # release workflow validates the artifacts before any of them become visible.
+  # GoReleaser therefore builds and signs but never touches the GitHub API.
   disable: true

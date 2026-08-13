@@ -9,8 +9,9 @@ Prerequisites:
 
 - [mise](https://mise.jdx.dev) — provisions every pinned tool from `mise.toml` +
   `mise.lock`: Go, Moon, Python + uv (for the MkDocs docs project), the
-  `golangci-lint` CLI, and `melange`/`apko`/`cosign` for releases. Run
-  `mise install` once; there is nothing else to install by hand.
+  `golangci-lint` CLI, `terraform`/`tofu` for acceptance tests, and
+  `goreleaser`/`syft`/`cosign` for releases. Run `mise install` once; there is
+  nothing else to install by hand.
 
 Tool versions live in `mise.toml`; `mise.lock` records a per-platform download URL
 and checksum for each (and, for the aqua-backed CLIs, cosign/SLSA/GitHub-attestation
@@ -130,22 +131,75 @@ They default to immutable releases, private vulnerability reporting, signed comm
 
 ## Release Layer
 
-Release automation is enabled for the template application so this repository proves the full binary and container release lifecycle before generated projects inherit it.
-Repositories generated from the template should update the release app credentials, package names, asset patterns, container image name, and `ghd.toml` signer workflow before cutting their first release.
+A release publishes exactly what the Terraform and OpenTofu registries ingest.
+Both registries discover a release by reading its asset names, so for version `X.Y.Z` (tag `vX.Y.Z`) the release carries:
+
+| Asset | Contents |
+|-------|----------|
+| `terraform-provider-example_X.Y.Z_<os>_<arch>.zip` | One per platform, each holding a single binary named `terraform-provider-example_vX.Y.Z` (`.exe` on Windows) |
+| `terraform-provider-example_X.Y.Z_manifest.json` | Copy of `terraform-registry-manifest.json`, declaring protocol 6.0 |
+| `terraform-provider-example_X.Y.Z_SHA256SUMS` | Checksums for every zip, SBOM, and the manifest |
+| `terraform-provider-example_X.Y.Z_SHA256SUMS.sig` | Detached binary GPG signature the registries verify |
+
+The release also ships a CycloneDX SBOM per zip and a cosign bundle over the checksum file.
+Those are additive; the registries ignore them.
 
 The release path is:
 
 - Release Please opens and maintains the release PR.
-- Release Please creates a draft GitHub release and tag after merge.
-- Release Dry Run rehearses the GoReleaser binary path and the native-runner melange/apko container build path on pull requests.
-- GoReleaser builds binaries, checksums, and SBOMs without publishing directly.
-- The release workflow uploads assets to the draft release; a separate, isolated reusable workflow (`attest.yml`) generates the GitHub-hosted provenance attestation for the binary checksums.
-- The release workflow builds amd64 and arm64 apks with melange on native GitHub-hosted runners, assembles and publishes `ghcr.io/meigma/template-go:vX.Y.Z` as a multi-platform manifest with apko, signs it with keyless cosign, and attaches a syft SBOM attestation; the isolated `attest.yml` workflow then creates the GitHub-native provenance attestation for the manifest digest.
-- Generating both provenance attestations in the isolated `attest.yml` reusable workflow (not in the build job) keeps the signing identity unreachable by build steps — the SLSA Build L3 isolation requirement — while staying on GitHub's attestation API (verify with `gh attestation verify --signer-workflow …/attest.yml`).
-- A human inspects the draft release before publication.
+- Release Please creates the tag and a **draft** GitHub release after merge.
+- Release Dry Run rehearses the whole GoReleaser path — including GPG signing and the contract checks — against a synthetic version on release PRs, and uploads nothing.
+- GoReleaser builds the zips, SBOMs, and checksum file, and signs the checksum file with the repository's GPG key.
+- The release workflow stages the assets, asserts the registry contract (`scripts/check-release-contract.sh`), smoke tests the host binary, and uploads everything to the draft.
+- A separate job adds a keyless cosign signature over the checksum file, and the isolated `attest.yml` reusable workflow generates GitHub-native provenance for every file the checksum file lists.
+- The draft becomes public only after all of the above succeed. A failure anywhere leaves the release a draft, invisible to both registries.
 
-The root `ghd.toml` matches the default GoReleaser output so generated projects can be installed with `ghd` once the release workflow runs.
-After cloning this template, update `provenance.signer_workflow`, package names, asset patterns, binary paths, and image names to match the new repository and binary name.
+Generating provenance in the isolated `attest.yml` reusable workflow rather than in the build job keeps the signing identity unreachable by build steps — the SLSA Build L3 isolation requirement — while staying on GitHub's attestation API.
+
+### Signing Key Setup
+
+Run this once per repository, before the first release:
+
+```sh
+scripts/gpg-provision.sh
+```
+
+It generates a dedicated RSA 4096 signing key, stores the private half and its passphrase in the `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` Actions secrets, and prints the public key.
+Register that public key with both registries — the Terraform Registry under User or Org Settings → Signing Keys, and OpenTofu through a submission issue on `opentofu/registry`.
+Neither registry accepts a release it cannot verify against a key you registered first.
+Re-run with `--force` only to rotate the key; the script refuses to overwrite existing secrets otherwise.
+
+### Verifying a Release
+
+Import the project's public signing key (the one registered with the registries), then:
+
+```sh
+gh release download vX.Y.Z --repo meigma/template-tf-provider --dir provider
+cd provider
+
+# 1. The signature the registries themselves check.
+gpg --verify terraform-provider-example_X.Y.Z_SHA256SUMS.sig \
+  terraform-provider-example_X.Y.Z_SHA256SUMS
+
+# 2. Every downloaded file matches the checksum file.
+sha256sum -c terraform-provider-example_X.Y.Z_SHA256SUMS
+
+# 3. The checksum file came from this repository's release workflow.
+cosign verify-blob \
+  --bundle terraform-provider-example_X.Y.Z_SHA256SUMS.sigstore.json \
+  --certificate-identity https://github.com/meigma/template-tf-provider/.github/workflows/release.yml@refs/tags/vX.Y.Z \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  terraform-provider-example_X.Y.Z_SHA256SUMS
+
+# 4. GitHub-native build provenance for any artifact.
+gh attestation verify terraform-provider-example_X.Y.Z_linux_amd64.zip \
+  --repo meigma/template-tf-provider \
+  --signer-workflow meigma/template-tf-provider/.github/workflows/attest.yml \
+  --source-ref refs/tags/vX.Y.Z \
+  --deny-self-hosted-runners
+```
+
+Repositories generated from this template must update the provider name, module path, provider address, and the repository slugs in these commands before cutting a release.
 
 ## Contributing
 
