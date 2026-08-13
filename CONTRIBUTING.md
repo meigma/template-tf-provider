@@ -43,6 +43,23 @@ moon run root:build
 moon run root:test
 ```
 
+## Acceptance Tests
+
+The acceptance tests in `internal/provider` start a real Terraform-compatible
+CLI and run plan, apply, import, and destroy against the provider. They are
+never run automatically: `moon ci` skips the task, and the only workflow that
+runs them is dispatched by hand from the Actions tab. `moon run root:test` and
+`go test ./...` skip them too, because they need `TF_ACC` set.
+
+```sh
+moon run root:testacc                                  # against the pinned OpenTofu
+TF_ACC_TERRAFORM_PATH=$(mise which terraform) \
+  moon run root:testacc                                # against the pinned Terraform
+```
+
+The task picks the pinned `tofu` binary unless `TF_ACC_TERRAFORM_PATH` names
+another one. Both CLIs are pinned in `mise.toml`.
+
 The provider binary is a plugin, so running it directly only prints an error.
 To exercise it against Terraform, build it and start it in debug mode:
 

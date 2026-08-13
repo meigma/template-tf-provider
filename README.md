@@ -48,6 +48,17 @@ CI runs the same aggregate check:
 moon ci --summary minimal
 ```
 
+Acceptance tests are the exception. They drive a real Terraform-compatible CLI
+through plan, apply, and destroy, so nothing runs them automatically — not
+`moon ci`, not a pull request, not a schedule. Run them yourself, or dispatch
+the **Acceptance Tests** workflow from the Actions tab:
+
+```sh
+moon run root:testacc                                  # against the pinned OpenTofu
+TF_ACC_TERRAFORM_PATH=$(mise which terraform) \
+  moon run root:testacc                                # against the pinned Terraform
+```
+
 The starter CLI is intentionally small:
 
 ```sh

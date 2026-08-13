@@ -77,6 +77,27 @@ tasks:
     options:
       cache: false
 
+  # Acceptance tests: a real Terraform-compatible CLI running plan / apply /
+  # destroy against the provider. They are deliberately unreachable from
+  # automation (`runInCI: false`, and no `check` dependency), so the only ways
+  # in are `moon run root:testacc` and the manually dispatched testacc workflow.
+  #
+  # terraform-plugin-testing picks its CLI from TF_ACC_TERRAFORM_PATH, and it
+  # never discovers OpenTofu on its own: left unset it looks for a binary named
+  # `terraform` and downloads one when it finds none. A task `env` block cannot
+  # shell out, so the default is resolved in the script instead — an inherited
+  # TF_ACC_TERRAFORM_PATH wins, and otherwise the mise-pinned `tofu` already on
+  # PATH is used.
+  testacc:
+    script: 'TF_ACC_TERRAFORM_PATH="${TF_ACC_TERRAFORM_PATH:-$(command -v tofu)}" go test ./internal/provider/ -run TestAcc -v -timeout 30m'
+    env:
+      TF_ACC: '1'
+    inputs:
+      - '@group(goSources)'
+    options:
+      cache: false
+      runInCI: false
+
   check:
     deps:
       - 'root:format'
