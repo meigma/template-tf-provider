@@ -22,7 +22,7 @@ updates:
       - go
 
   - package-ecosystem: uv
-    directory: /docs
+    directory: /
     schedule:
       interval: weekly
     commit-message:

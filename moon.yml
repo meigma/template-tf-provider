@@ -41,12 +41,32 @@ fileGroups:
     - 'release-please-config.json'
     - '.release-please-manifest.json'
     - '.github/workflows.disabled/**/*.yml'
+  # What tfplugindocs reads: the templates it renders and the example
+  # configurations it embeds. The provider schema is the third input and comes
+  # from @group(goSources).
+  docsGenSources:
+    - 'templates/**/*'
+    - 'examples/**/*'
+  # What MkDocs reads: the whole docs/ tree (generated reference pages and
+  # hand-written pages alike), the site config, and the pinned Python
+  # environment the build runs in.
+  docsSiteSources:
+    - 'docs/**/*'
+    - 'mkdocs.yml'
+    - 'pyproject.toml'
+    - 'uv.lock'
+    - '.python-version'
 
 workspace:
   inheritedTasks:
     include: []
 
 tasks:
+  # format and lint are two golangci-lint invocations sharing one cache
+  # directory that moon cannot see, so they take a mutex rather than running
+  # side by side. Run concurrently under `check`, golangci-lint intermittently
+  # exits 3 (failed to run, not "issues found") — roughly once in thirty runs
+  # on this machine, and never when either runs alone.
   format:
     command: 'golangci-lint fmt --config .golangci.yml --diff'
     inputs:
@@ -54,6 +74,7 @@ tasks:
       - '@group(lintConfig)'
     options:
       cache: false
+      mutex: 'golangci-lint'
 
   lint:
     command: 'golangci-lint run --config .golangci.yml ./... --show-stats=false'
@@ -62,6 +83,7 @@ tasks:
       - '@group(lintConfig)'
     options:
       cache: false
+      mutex: 'golangci-lint'
 
   build:
     command: 'go build -o bin/terraform-provider-example .'
@@ -110,13 +132,118 @@ tasks:
       cache: false
       runInCI: false
 
+  # Rewrites the registry-format pages under docs/ from the provider schema,
+  # templates/, and examples/. These files are committed, and `docs-check`
+  # fails when they drift, so this is the only supported way to change them.
+  #
+  # --provider-name is not optional: without it tfplugindocs derives the name
+  # from the checkout's directory name, which is not `terraform-provider-example`
+  # in this repository (or in a worktree), and no resource would be matched.
+  docs-gen:
+    command: 'tfplugindocs generate --provider-name terraform-provider-example'
+    inputs:
+      - '@group(goSources)'
+      - '@group(docsGenSources)'
+    options:
+      cache: false
+      # A developer command, not a gate. Left on, `moon ci` would rewrite docs/
+      # while `docs-check` was reading it, which is both pointless and racy;
+      # `docs-check` is what CI needs from this pair.
+      runInCI: false
+
+  # The drift gate for the generated pages.
+  #
+  # It renders into .docs-check/ instead of over docs/ for two reasons: `moon
+  # run root:check` must not rewrite files in the working tree, and a hand-edit
+  # of a generated page has to fail the check whether or not it was committed —
+  # regenerating in place would quietly revert an uncommitted edit and pass.
+  # Only the directories tfplugindocs manages are compared; hand-written pages
+  # under docs/ are not its output and are left out of the diff.
+  docs-check:
+    script: |
+      rm -rf .docs-check
+      tfplugindocs generate --provider-name terraform-provider-example --rendered-website-dir .docs-check/generated
+      mkdir -p .docs-check/committed
+      for name in index.md data-sources resources guides functions ephemeral-resources actions list-resources state-stores; do
+        if [ -e "docs/$name" ]; then
+          cp -R "docs/$name" .docs-check/committed/
+        fi
+      done
+      if ! diff -ru .docs-check/committed .docs-check/generated; then
+        echo "docs/ does not match tfplugindocs output; run 'moon run root:docs-gen' and commit the result" >&2
+        exit 1
+      fi
+      rm -rf .docs-check
+    inputs:
+      - '@group(goSources)'
+      - '@group(docsGenSources)'
+      - 'docs/**/*'
+    options:
+      cache: false
+      runInCI: true
+
+  # The registry's own rules, checked before publishing rather than after: file
+  # extensions, the 500KB-per-document storage limit, frontmatter fields, and
+  # that every documented page matches a real resource or data source. It also
+  # rejects a subdirectory nested inside one of the generated directories, so
+  # docs/resources/<group>/<page>.md is not a layout that can be published.
+  #
+  # It only reads the directories the registries read. The hand-written pages
+  # under docs/tutorials, docs/how-to, and docs/explanation are outside its
+  # scope, which is the same reason the registries ignore them.
+  docs-validate:
+    command: 'tfplugindocs validate --provider-name terraform-provider-example'
+    inputs:
+      - '@group(goSources)'
+      - 'docs/**/*'
+    options:
+      cache: false
+      runInCI: true
+
+  # uv owns the .venv; moon only needs to know the task ran.
+  docs-deps:
+    command: 'uv sync --locked'
+    inputs:
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.python-version'
+    outputs:
+      - '.venv/pyvenv.cfg'
+    options:
+      cache: false
+
+  docs-build:
+    command: 'uv run --locked mkdocs build --strict'
+    deps:
+      - 'root:docs-deps'
+    inputs:
+      - '@group(docsSiteSources)'
+    outputs:
+      - 'site/**/*'
+
+  # A blocking dev server. moon infers that from tasks literally named `serve`,
+  # but not from this one, so both options are set by hand — without them
+  # `moon ci` starts the server and waits forever.
+  docs-serve:
+    command: 'uv run --locked mkdocs serve --dev-addr 127.0.0.1:8000'
+    deps:
+      - 'root:docs-deps'
+    inputs:
+      - '@group(docsSiteSources)'
+    options:
+      cache: false
+      persistent: true
+      runInCI: false
+
   check:
     deps:
       - 'root:format'
       - 'root:lint'
       - 'root:build'
       - 'root:test'
-      - 'docs:build'
+      - 'root:docs-check'
+      - 'root:docs-validate'
+      - 'root:docs-build'
     inputs:
       - '@group(goSources)'
       - '@group(lintConfig)'

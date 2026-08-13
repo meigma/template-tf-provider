@@ -43,6 +43,15 @@ formatters:
       # Default: 100
       max-len: 120
 
+  exclusions:
+    # `golangci-lint fmt` walks the working tree itself instead of taking
+    # package patterns, and it does not read .gitignore. Build output has to be
+    # named here or the formatter descends into it — and fails outright when
+    # the docs build happens to be rewriting site/ at the same moment.
+    paths:
+      - ^site($|/)
+      - ^\.docs-check($|/)
+
 linters:
   enable:
     - asasalint # checks for pass []any as any in variadic func(...any)

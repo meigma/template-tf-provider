@@ -25,6 +25,12 @@ python = "3.14.3"
 "aqua:golangci/golangci-lint" = "2.12.2"
 "aqua:vektra/mockery"         = "3.7.2"
 
+# tfplugindocs renders the registry-format provider documentation under docs/
+# from the provider's own schema plus the examples/ tree. The generated files
+# are committed and drift-checked (`moon run root:docs-check`), so this pin is
+# what decides their content — bumping it will usually produce a docs diff.
+"aqua:hashicorp/terraform-plugin-docs" = "0.25.0"
+
 # Terraform-compatible CLIs used to exercise the provider end to end. The
 # acceptance tests (`moon run root:testacc`) drive one of these binaries through
 # real plan / apply / destroy cycles; the manually dispatched testacc workflow
