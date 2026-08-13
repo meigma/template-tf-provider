@@ -1,0 +1,72 @@
+# MkDocs configuration for the documentation site.
+#
+# `docs/` is shared with the Terraform and OpenTofu registries: they read
+# `index.md`, `resources/`, and `data-sources/` from it in their own format, and
+# tfplugindocs regenerates those files from the provider schema. This config
+# therefore lives at the repository root, outside `docs_dir`, and the site is
+# built into `site/`, which is ignored by git.
+site_name: template-tf-provider
+site_description: Meigma Terraform provider repository template
+site_url: https://meigma.github.io/template-tf-provider/
+repo_name: meigma/template-tf-provider
+repo_url: https://github.com/meigma/template-tf-provider
+edit_uri: edit/master/docs/
+docs_dir: docs
+site_dir: site
+strict: true
+
+theme:
+  name: material
+  language: en
+  features:
+    - content.action.edit
+    - navigation.instant
+    - navigation.tracking
+    - search.highlight
+    - search.suggest
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+# Reference/ holds the tfplugindocs output. Everything else is written by hand.
+nav:
+  - Home: index.md
+  - Tutorial:
+      - Your first example_item: tutorials/first-item.md
+  - How-to guides:
+      - Use the provider from a local build: how-to/local-build.md
+      - Run the acceptance tests: how-to/acceptance-tests.md
+  - Reference:
+      - example_item resource: resources/item.md
+      - example_item data source: data-sources/item.md
+  - Explanation:
+      - How this provider is structured: explanation/architecture.md
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+
+extra_css:
+  - stylesheets/palette.css

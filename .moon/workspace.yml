@@ -1,12 +1,16 @@
 # Shared Moon workspace configuration for the repository template.
 # Keep the current projects explicit, then uncomment the discovery patterns
 # below as the template grows into apps, packages, services, or tools.
+#
+# docs/ is deliberately not a project. The Terraform and OpenTofu registries
+# read provider documentation out of that directory, so it holds documentation
+# and nothing else; the docs tasks and their configuration live in the root
+# project instead.
 
 projects:
   globs: []
   sources:
     root: '.'
-    docs: 'docs'
 
   # Uncomment to auto-discover more projects as the repository grows.
   # globs:

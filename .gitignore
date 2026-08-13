@@ -51,7 +51,9 @@ site/
 *.egg-info/
 .eggs/
 pip-wheel-metadata/
-!docs/.python-version
+# The docs toolchain's uv project lives at the repository root, so its
+# interpreter pin is tracked rather than treated as a personal override.
+!/.python-version
 
 # Node / TypeScript
 node_modules/
@@ -72,9 +74,12 @@ pnpm-debug.log*
 .svelte-kit/
 coverage/
 
-# Template repo outputs
-docs/build/
-docs/.venv/
+# Docs pipeline outputs. `site/` is the built MkDocs site (already matched by
+# the Python block above; repeated here because this is where it comes from),
+# and `.docs-check/` is where the docs drift check regenerates the registry
+# pages so it can diff them without touching the working tree.
+/site/
+/.docs-check/
 
 # OS / editor
 .DS_Store
