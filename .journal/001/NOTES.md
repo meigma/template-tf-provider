@@ -36,3 +36,6 @@ Opus subagent completed the conversion; I reviewed the full diff, re-ran root:ch
 
 ## 2026-08-12 17:52 — PR #6 all checks green
 Kusari flagged two reachable transitive CVEs from terraform-plugin-framework (grpc v1.79.2 critical CVE-2026-33186 + GO-2026-6061; x/net v0.48.0 high CVE-2026-39821). Subagent pinned grpc v1.83.0 and x/net v0.58.0 via MVS (x/sys, x/text, genproto/rpc moved forward as side effects); I reviewed, committed (deps:), pushed. PR #6 now: ci pass, Kusari pass, Pages pass, dry-run skip-as-designed. Awaiting user review/squash-merge before Phase 2.
+
+## 2026-08-12 18:02 — Phase 1 merged; Phase 2 started
+User approved: PR #6 squash-merged (master e7841bf); phase-1 worktree and remote branch removed. Created feat/example-provider worktree; spawned Opus subagent for Phase 2 (hexagonal example provider). Notable brief decisions: backing store is FILE-BACKED (JSON, atomic rename) not in-memory, so state survives across CLI invocations and acceptance tests stay hermetic; provider config store_path attr with EXAMPLE_STORE_PATH fallback; opentofu mise pin pulled forward from Phase 3 because Phase 2's dev_overrides functional exit needs it; mockery added via mise with mock for core.Store in core/mocks.
