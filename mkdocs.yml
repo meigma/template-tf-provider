@@ -48,6 +48,7 @@ nav:
   - How-to guides:
       - Use the provider from a local build: how-to/local-build.md
       - Run the acceptance tests: how-to/acceptance-tests.md
+      - Publish to the registries: how-to/publish.md
   - Reference:
       - example_item resource: resources/item.md
       - example_item data source: data-sources/item.md

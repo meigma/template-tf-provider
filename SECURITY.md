@@ -10,7 +10,8 @@ For a brand-new project, a short policy such as "only the latest release is supp
 
 ## Reporting a Vulnerability
 
-Report vulnerabilities privately through GitHub's private vulnerability reporting flow when it is enabled for the generated repository.
+Report vulnerabilities privately through GitHub's private vulnerability reporting flow.
+`.github/repository-settings.toml` enables it, so it is available on any repository that has had those settings applied.
 
 Do not use public GitHub issues, pull requests, discussions, chat channels, or other public forums for vulnerability reports.
 

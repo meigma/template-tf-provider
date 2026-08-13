@@ -1,39 +1,65 @@
-# template-go
+# template-tf-provider
 
-`template-go` is the reusable Go repository starter for Meigma projects.
-It includes a small Go CLI skeleton, Moon tasks, pinned CI, Dependabot, baseline repository security settings, and an enabled Release Please plus GoReleaser release layer.
+`template-tf-provider` is the GitHub template Meigma Terraform providers start
+from. It is a working [Plugin Framework](https://developer.hashicorp.com/terraform/plugin/framework)
+provider — a worked resource and data source over a hexagonal package split —
+wrapped in the toolchain, documentation pipeline, and release machinery a
+published provider needs.
+
+The release path is enabled in this repository rather than left as a sketch, so
+the whole thing (GPG signing, registry contract checks, attestation) is
+exercised here before a generated project inherits it.
+
+## Quickstart
+
+1. Create a repository from this template. Name it
+   `terraform-provider-<name>`, all lowercase — the Terraform Registry accepts
+   no other pattern.
+2. Clone it and run `mise install`.
+3. Work through [DELETE_ME.md](DELETE_ME.md), which covers renaming the module
+   and provider, replacing the example resource, and the one-time repository
+   setup needed before the first release.
 
 ## Local Bootstrap
 
 Prerequisites:
 
-- [mise](https://mise.jdx.dev) — provisions every pinned tool from `mise.toml` +
-  `mise.lock`: Go, Moon, Python + uv (for the MkDocs docs project), the
-  `golangci-lint` CLI, `terraform`/`tofu` for acceptance tests, and
-  `goreleaser`/`syft`/`cosign` for releases. Run `mise install` once; there is
-  nothing else to install by hand.
+- [mise](https://mise.jdx.dev) — provisions every pinned tool from `mise.toml`
+  and `mise.lock`: Go, Moon, Python and uv (for the MkDocs project),
+  `golangci-lint`, `tfplugindocs`, `terraform` and `tofu` for acceptance tests,
+  and `goreleaser`/`syft`/`cosign` for releases. Run `mise install` once; there
+  is nothing else to install by hand.
 
-Tool versions live in `mise.toml`; `mise.lock` records a per-platform download URL
-and checksum for each (and, for the aqua-backed CLIs, cosign/SLSA/GitHub-attestation
-verification). `mise install` runs with `locked = true`, so it **fails closed** if a
-tool lacks a pre-resolved, checksummed entry for the current platform. Moon runs every
-task against these tools as `system` binaries on PATH and manages no toolchain itself.
-To bump a tool, edit its version in `mise.toml`, run
+`mise.lock` records a per-platform download URL and checksum for each tool (and,
+for the aqua-backed CLIs, cosign/SLSA/GitHub-attestation verification).
+`mise install` runs with `locked = true`, so it **fails closed** if a tool lacks
+a pre-resolved, checksummed entry for the current platform. Moon runs every task
+against these tools as `system` binaries on `PATH` and manages no toolchain
+itself. To bump a tool, edit its version in `mise.toml`, run
 `mise lock --platform linux-x64,linux-arm64,macos-x64,macos-arm64`, and commit
-`mise.toml` + `mise.lock`.
+both files.
 
-After creating a new repository from this template, replace the placeholder names before doing feature work:
+## The Example Provider
 
-```sh
-go mod edit -module github.com/meigma/YOUR_REPO
-mv cmd/template-go cmd/YOUR_BINARY
-```
+The provider serves one resource and one data source, both named `example_item`,
+backed by a JSON file on disk. They are meant to be replaced. What should
+survive the replacement is the split they demonstrate:
 
-Then update `template-go` references in the Moon tasks, GoReleaser config, `ghd.toml`, README, and package docs.
+| Package | Role |
+|---------|------|
+| `internal/core` | The domain: the item type, its rules, and the `Store` port. No Terraform types, no I/O. |
+| `internal/client` | A `Store` implementation over a JSON file. A real provider puts an HTTP client here. |
+| `internal/provider` | The Terraform adapter: configuration, plan, and state in, domain calls out, diagnostics back. |
 
-## Common Tasks
+Dependencies point inward, so the domain tests run without side effects, the
+provider tests run against a `mockery`-generated mock, and the storage adapter
+is tested on its own. [How this provider is structured](docs/explanation/architecture.md)
+covers why, including the rule that a provider may not silently rewrite a value
+the user configured.
 
-Moon is the standard task front door:
+## Development
+
+Moon is the task front door:
 
 ```sh
 moon run root:format
@@ -43,39 +69,46 @@ moon run root:test
 moon run root:check
 ```
 
-CI runs the same aggregate check:
+`check` is the aggregate: formatting, linting, build, unit tests, the release
+script tests, the docs drift check, the registry docs validation, and the
+MkDocs build. CI runs the same path:
 
 ```sh
 moon ci --summary minimal
 ```
 
-Acceptance tests are the exception. They drive a real Terraform-compatible CLI
-through plan, apply, and destroy, so nothing runs them automatically — not
-`moon ci`, not a pull request, not a schedule. Run them yourself, or dispatch
-the **Acceptance Tests** workflow from the Actions tab:
+`moon run root:build` writes `bin/terraform-provider-example`. A provider is a
+plugin, so running that binary directly only prints an error; to exercise it
+against a CLI, see
+[Use the provider from a local build](docs/how-to/local-build.md).
+
+### Acceptance tests
+
+Acceptance tests drive a real Terraform-compatible CLI through plan, apply,
+import, and destroy. Nothing runs them automatically — not `moon ci`, not a
+pull request, not a schedule:
 
 ```sh
-moon run root:testacc                                  # against the pinned OpenTofu
+moon run root:testacc                                  # the pinned OpenTofu
 TF_ACC_TERRAFORM_PATH=$(mise which terraform) \
-  moon run root:testacc                                # against the pinned Terraform
+  moon run root:testacc                                # the pinned Terraform
 ```
 
-The starter CLI is intentionally small:
+Or dispatch the **Acceptance Tests** workflow from the Actions tab and pick
+`tofu`, `terraform`, or both.
 
-```sh
-go run ./cmd/template-go --version
-go run ./cmd/template-go --message "hello from cobra"
-go test ./...
-```
-
-The CLI entrypoint uses Cobra and Viper in the same shape as other Meigma CLIs: `cmd/template-go` stays thin, `internal/cli` owns command construction, and Viper-backed flags can also be supplied through `TEMPLATE_GO_*` environment variables.
+The task is marked `runInCI: false`, and Moon drops such tasks whenever `CI` is
+set in the environment — including for an explicit `moon run root:testacc`. If
+you export `CI` in your shell, the run fails with "No tasks found" rather than
+skipping quietly. Unset it, or run the task through `env -u CI`.
 
 ## Documentation
 
 `docs/` is one tree with two consumers. The Terraform and OpenTofu registries
 read `docs/index.md`, `docs/resources/`, and `docs/data-sources/` from it in
 their own format; MkDocs builds the same tree, plus the hand-written tutorial,
-how-to guides, and explanation, into the published site.
+how-to guides, and explanation, into the
+[published site](https://meigma.github.io/template-tf-provider/).
 
 Those three registry paths are generated by
 [tfplugindocs](https://github.com/hashicorp/terraform-plugin-docs) from the
@@ -84,10 +117,11 @@ provider schema, `templates/`, and `examples/`. **Never edit them by hand** —
 the committed copies differ.
 
 ```sh
-moon run root:docs-gen      # regenerate docs/index.md, docs/resources/, docs/data-sources/
-moon run root:docs-check    # fail if the committed pages have drifted (runs in CI)
-moon run root:docs-build    # build the MkDocs site into site/
-moon run root:docs-serve    # preview it at http://127.0.0.1:8000
+moon run root:docs-gen       # regenerate index.md, resources/, data-sources/
+moon run root:docs-check     # fail if the committed pages have drifted
+moon run root:docs-validate  # check the registries' own rules on those pages
+moon run root:docs-build     # build the MkDocs site into site/
+moon run root:docs-serve     # preview it at http://127.0.0.1:8000
 ```
 
 Everything else under `docs/` is written by hand and belongs in `mkdocs.yml`'s
@@ -95,83 +129,81 @@ Everything else under `docs/` is written by hand and belongs in `mkdocs.yml`'s
 repository root, because MkDocs requires its config outside `docs_dir` and the
 registries expect nothing but documentation inside it.
 
-## Container Image
+## CI and Repository Settings
 
-The image is built **without a Dockerfile**:
-[melange](https://github.com/chainguard-dev/melange) compiles the binary into a
-signed [Wolfi](https://github.com/wolfi-dev) apk (`melange.yaml`), and
-[apko](https://github.com/chainguard-dev/apko) assembles it into a minimal,
-multi-arch, non-root runtime image (`apko.yaml`) — the modern equivalent of the
-former distroless image (uid 65532, ca-certificates, tzdata, no shell). Each
-architecture builds natively (no QEMU). Build and run it locally with the bundled
-mise task (it uses melange's Docker runner, so Docker must be running):
+The CI workflow keeps token permissions minimal, pins external actions,
+disables checkout credential persistence, and delegates the checks to Moon. It
+caches Go modules, Go build artifacts, golangci-lint state, and uv downloads
+through GitHub Actions; Moon remote caching is left as an optional follow-up
+for repositories that need a shared task-output cache. The GitHub Pages
+workflow builds the site on pull requests and deploys `site/` from the default
+branch. Dependabot covers GitHub Actions, the Go module, and the uv project.
 
-```sh
-mise run image-local              # build the host-arch image, load as template-go:dev
-docker run --rm template-go:dev --version
-docker run --rm template-go:dev --message "hello from container"
-```
-
-The Wolfi base intentionally floats to the latest packages (fresh CA bundle and
-timezones, low CVE surface); the exact resolved versions are recorded in the
-per-build SBOM and provenance attestation rather than pinned. `version`, `commit`,
-and `date` are stamped into the binary via melange `--vars-file` — the release
-workflow supplies the real values, and `mise run image-local` uses `dev`.
-
-## CI and Security
-
-The default CI workflow keeps permissions minimal, pins external actions, disables checkout credential persistence, and delegates checks to Moon.
-It uses GitHub-hosted dependency caches for Go, golangci-lint, and uv download artifacts while leaving Moon remote caching as an optional follow-up for repositories that need a shared task-output cache.
-The docs workflow builds the MkDocs site on pull requests and deploys `site/` to GitHub Pages from the default branch.
-The scheduled security scan workflow builds the local container image weekly, scans it for high/critical fixed vulnerabilities, and uploads SARIF results to GitHub code scanning.
-Dependabot covers GitHub Actions, the root Go module, and the uv project that builds the docs.
-
-Repository settings live in `.github/repository-settings.toml`.
-They default to immutable releases, private vulnerability reporting, signed commits, squash-only merges, GitHub Pages workflow publishing, and protected tags.
+Repository settings live in `.github/repository-settings.toml` and are applied
+by `.github/scripts/configure_github_repo.py`. They set signed commits,
+squash-only merges, protected tags, immutable releases, private vulnerability
+reporting, and Pages publishing from a workflow.
 
 ## Release Layer
 
-A release publishes exactly what the Terraform and OpenTofu registries ingest.
-Both registries discover a release by reading its asset names, so for version `X.Y.Z` (tag `vX.Y.Z`) the release carries:
+A release publishes exactly what the two registries ingest. Both discover a
+release by reading its asset names, so for version `X.Y.Z` (tag `vX.Y.Z`) the
+release carries:
 
 | Asset | Contents |
 |-------|----------|
-| `terraform-provider-example_X.Y.Z_<os>_<arch>.zip` | One per platform, each holding a single binary named `terraform-provider-example_vX.Y.Z` (`.exe` on Windows) |
+| `terraform-provider-example_X.Y.Z_<os>_<arch>.zip` | One per platform (13 in total), each holding a single binary named `terraform-provider-example_vX.Y.Z` (`.exe` on Windows) |
 | `terraform-provider-example_X.Y.Z_manifest.json` | Copy of `terraform-registry-manifest.json`, declaring protocol 6.0 |
 | `terraform-provider-example_X.Y.Z_SHA256SUMS` | Checksums for every zip, SBOM, and the manifest |
 | `terraform-provider-example_X.Y.Z_SHA256SUMS.sig` | Detached binary GPG signature the registries verify |
 
-The release also ships a CycloneDX SBOM per zip and a cosign bundle over the checksum file.
-Those are additive; the registries ignore them.
+The release also ships a CycloneDX SBOM per zip and a cosign bundle over the
+checksum file. Those are additive; the registries ignore them.
 
 The release path is:
 
 - Release Please opens and maintains the release PR.
 - Release Please creates the tag and a **draft** GitHub release after merge.
-- Release Dry Run rehearses the whole GoReleaser path — including GPG signing and the contract checks — against a synthetic version on release PRs, and uploads nothing.
-- GoReleaser builds the zips, SBOMs, and checksum file, and signs the checksum file with the repository's GPG key.
-- The release workflow stages the assets, asserts the registry contract (`scripts/check-release-contract.sh`), smoke tests the host binary, and uploads everything to the draft.
-- A separate job adds a keyless cosign signature over the checksum file, and the isolated `attest.yml` reusable workflow generates GitHub-native provenance for every file the checksum file lists.
-- The draft becomes public only after all of the above succeed. A failure anywhere leaves the release a draft, invisible to both registries.
+- Release Dry Run rehearses the whole GoReleaser path — GPG signing and the
+  contract checks included — against a synthetic version on release PRs, and
+  uploads nothing.
+- GoReleaser builds the zips, SBOMs, and checksum file, and signs the checksum
+  file with the repository's GPG key.
+- The release workflow stages the assets, asserts the registry contract
+  (`scripts/check-release-contract.sh`), smoke tests the host binary, and
+  uploads everything to the draft.
+- A separate job adds a keyless cosign signature over the checksum file, and
+  the isolated `attest.yml` reusable workflow generates GitHub-native
+  provenance for every file the checksum file lists.
+- The draft becomes public only after all of the above succeed. A failure
+  anywhere leaves the release a draft, invisible to both registries.
 
-Generating provenance in the isolated `attest.yml` reusable workflow rather than in the build job keeps the signing identity unreachable by build steps — the SLSA Build L3 isolation requirement — while staying on GitHub's attestation API.
+Generating provenance in the isolated `attest.yml` reusable workflow rather than
+in the build job keeps the signing identity unreachable by build steps — the
+SLSA Build L3 isolation requirement — while staying on GitHub's attestation API.
 
-### Signing Key Setup
+### Publishing
 
-Run this once per repository, before the first release:
+Before the first release, provision the signing key and register it with both
+registries:
 
 ```sh
 scripts/gpg-provision.sh
 ```
 
-It generates a dedicated RSA 4096 signing key, stores the private half and its passphrase in the `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` Actions secrets, and prints the public key.
-Register that public key with both registries — the Terraform Registry under User or Org Settings → Signing Keys, and OpenTofu through a submission issue on `opentofu/registry`.
-Neither registry accepts a release it cannot verify against a key you registered first.
-Re-run with `--force` only to rotate the key; the script refuses to overwrite existing secrets otherwise.
+It generates a dedicated RSA 4096 signing key, stores the private half and its
+passphrase in the `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` Actions secrets, and
+prints the public key. Neither registry accepts a release it cannot verify
+against a key you registered first. Re-run with `--force` only to rotate the
+key; the script refuses to overwrite existing secrets otherwise.
+
+[How to publish the provider to the registries](docs/how-to/publish.md) walks
+through key registration and the one-time listing in each registry.
 
 ### Verifying a Release
 
-Import the project's public signing key (the one registered with the registries), then:
+Import the project's public signing key (the one registered with the
+registries), then:
 
 ```sh
 gh release download vX.Y.Z --repo meigma/template-tf-provider --dir provider
@@ -199,16 +231,21 @@ gh attestation verify terraform-provider-example_X.Y.Z_linux_amd64.zip \
   --deny-self-hosted-runners
 ```
 
-Repositories generated from this template must update the provider name, module path, provider address, and the repository slugs in these commands before cutting a release.
+Repositories generated from this template must update the provider name, module
+path, provider address, and repository slugs in these commands before cutting a
+release. [DELETE_ME.md](DELETE_ME.md) lists every place those names appear.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines, local setup expectations, and pull request workflow.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines, local setup
+expectations, and pull request workflow.
 
 ## Security
 
-See [SECURITY.md](SECURITY.md) for supported versions and the private vulnerability reporting path.
+See [SECURITY.md](SECURITY.md) for supported versions and the private
+vulnerability reporting path.
 
 ## License
 
-Add the repository license before publishing a project generated from this template.
+Add the repository license before publishing a project generated from this
+template.
