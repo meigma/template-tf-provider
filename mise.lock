@@ -68,6 +68,26 @@ url = "https://github.com/moonrepo/moon/releases/download/v2.3.5/moon_cli-aarch6
 checksum = "sha256:ffc0bf6e808f2c08f97593adec269c41fc6396e1399f546f13bb2f878efb6ce7"
 url = "https://github.com/moonrepo/moon/releases/download/v2.3.5/moon_cli-x86_64-apple-darwin.tar.xz"
 
+[[tools."aqua:opentofu/opentofu"]]
+version = "1.12.5"
+backend = "aqua:opentofu/opentofu"
+
+[tools."aqua:opentofu/opentofu"."platforms.linux-arm64"]
+checksum = "sha256:e67e9da2b1ddf5050ebee62a584cb826eafe1dfd3827d7ec20899ac62791ed1a"
+url = "https://github.com/opentofu/opentofu/releases/download/v1.12.5/tofu_1.12.5_linux_arm64.tar.gz"
+
+[tools."aqua:opentofu/opentofu"."platforms.linux-x64"]
+checksum = "sha256:a6894d45ae7a17ce83189cce8fe04b5a65f68cefceb62455b5a6a89fa53ab38f"
+url = "https://github.com/opentofu/opentofu/releases/download/v1.12.5/tofu_1.12.5_linux_amd64.tar.gz"
+
+[tools."aqua:opentofu/opentofu"."platforms.macos-arm64"]
+checksum = "sha256:2ae38150a667f5c0bd57b318d18ad8091d08f93fcca40345f3d88998661de5a9"
+url = "https://github.com/opentofu/opentofu/releases/download/v1.12.5/tofu_1.12.5_darwin_arm64.tar.gz"
+
+[tools."aqua:opentofu/opentofu"."platforms.macos-x64"]
+checksum = "sha256:1012d8f3d4567bcbcd1f2c7d766feca39a30bced32fb8be47e1887fbbee2456d"
+url = "https://github.com/opentofu/opentofu/releases/download/v1.12.5/tofu_1.12.5_darwin_amd64.tar.gz"
+
 [[tools."aqua:sigstore/cosign"]]
 version = "3.1.1"
 backend = "aqua:sigstore/cosign"
@@ -91,6 +111,26 @@ provenance = "cosign"
 checksum = "sha256:14d2678dfbfde18798151e86fbd91ebdadbb7424b18412a42a155dd8a2df4c7a"
 url = "https://github.com/sigstore/cosign/releases/download/v3.1.1/cosign-darwin-amd64"
 provenance = "cosign"
+
+[[tools."aqua:vektra/mockery"]]
+version = "3.7.2"
+backend = "aqua:vektra/mockery"
+
+[tools."aqua:vektra/mockery"."platforms.linux-arm64"]
+checksum = "sha256:27141b83d8bccc29d66ed91093da69604b320d417bd562d819c8b0372f1444ad"
+url = "https://github.com/vektra/mockery/releases/download/v3.7.2/mockery_3.7.2_Linux_arm64.tar.gz"
+
+[tools."aqua:vektra/mockery"."platforms.linux-x64"]
+checksum = "sha256:db819b897de126634cefeb3773a3b76eea7769c718f0e5e62e968ab00add12c6"
+url = "https://github.com/vektra/mockery/releases/download/v3.7.2/mockery_3.7.2_Linux_x86_64.tar.gz"
+
+[tools."aqua:vektra/mockery"."platforms.macos-arm64"]
+checksum = "sha256:f30c556a7c34df2002062aa6b0a014076b37f4f45429c70407804ee39aae71cf"
+url = "https://github.com/vektra/mockery/releases/download/v3.7.2/mockery_3.7.2_Darwin_arm64.tar.gz"
+
+[tools."aqua:vektra/mockery"."platforms.macos-x64"]
+checksum = "sha256:fddf50e1b43c97e7ae150784c922a73772d6304346294a90ce5cd24b0090b0cc"
+url = "https://github.com/vektra/mockery/releases/download/v3.7.2/mockery_3.7.2_Darwin_x86_64.tar.gz"
 
 [[tools.go]]
 version = "1.26.4"
