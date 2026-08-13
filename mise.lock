@@ -48,6 +48,26 @@ checksum = "sha256:f6f06d94b6241521c53d15450c5209b028270bf966f842afb11c030c79f5b
 url = "https://github.com/golangci/golangci-lint/releases/download/v2.12.2/golangci-lint-2.12.2-darwin-amd64.tar.gz"
 provenance = "github-attestations"
 
+[[tools."aqua:hashicorp/terraform"]]
+version = "1.15.8"
+backend = "aqua:hashicorp/terraform"
+
+[tools."aqua:hashicorp/terraform"."platforms.linux-arm64"]
+checksum = "sha256:8891e9dcedc9e3b8950bc6af9d4d8af1f4cfade3062f53b9dc403a89f6ce8c9c"
+url = "https://releases.hashicorp.com/terraform/1.15.8/terraform_1.15.8_linux_arm64.zip"
+
+[tools."aqua:hashicorp/terraform"."platforms.linux-x64"]
+checksum = "sha256:d25ce7b6902013ad905db3d2eab0be4cd905887fe88b81a6171b8d5503c31f3d"
+url = "https://releases.hashicorp.com/terraform/1.15.8/terraform_1.15.8_linux_amd64.zip"
+
+[tools."aqua:hashicorp/terraform"."platforms.macos-arm64"]
+checksum = "sha256:f210110c5698b94d803a7a63cdb0251b5455c150841478808e2bbb343f95ed68"
+url = "https://releases.hashicorp.com/terraform/1.15.8/terraform_1.15.8_darwin_arm64.zip"
+
+[tools."aqua:hashicorp/terraform"."platforms.macos-x64"]
+checksum = "sha256:e2e812e783771159bf758fd4e55d6dc9bb08f63e2af2c63d212721807a02c5dc"
+url = "https://releases.hashicorp.com/terraform/1.15.8/terraform_1.15.8_darwin_amd64.zip"
+
 [[tools."aqua:moonrepo/moon"]]
 version = "2.3.5"
 backend = "aqua:moonrepo/moon"

@@ -1,0 +1,79 @@
+name: Acceptance Tests
+
+# Manual dispatch only, on purpose. The acceptance tests stand up a real
+# Terraform-compatible CLI and run plan / apply / destroy against whatever the
+# provider talks to, so nothing here is wired to a push, a pull request, or a
+# schedule. `moon ci` does not reach them either: the testacc task is
+# `runInCI: false`.
+on:
+  workflow_dispatch:
+    inputs:
+      cli:
+        description: 'Which Terraform-compatible CLI to run the suite against.'
+        type: choice
+        required: true
+        default: 'tofu'
+        options:
+          - 'tofu'
+          - 'terraform'
+          - 'both'
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  testacc:
+    name: ${{ matrix.cli }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      # Let one CLI finish reporting even when the other fails; which of the two
+      # broke is the useful part of the result.
+      fail-fast: false
+      matrix:
+        # One leg per CLI when `both` is dispatched, otherwise the single leg
+        # that was asked for. The choice input is what makes building the JSON
+        # by hand safe: nothing but these three words can reach it.
+        cli: ${{ inputs.cli == 'both' && fromJSON('["tofu", "terraform"]') || fromJSON(format('["{0}"]', inputs.cli)) }}
+    env:
+      # Never auto-download a Go toolchain other than the mise-pinned one
+      # (mise [env] is not carried by the action's shims, so set it on the job).
+      GOTOOLCHAIN: local
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Setup mise
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        with:
+          version: 2026.6.14
+          cache: true
+          # Installs every tool from mise.toml honoring mise.lock (locked → fail
+          # closed), including moon and both Terraform-compatible CLIs.
+
+      - name: Resolve the CLI binary
+        id: cli
+        env:
+          CLI: ${{ matrix.cli }}
+        run: echo "path=$(mise which "$CLI")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Go modules
+        uses: actions/cache@2c8a9bd7457de244a408f35966fab2fb45fda9c8 # v6.0.0
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-mod-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-mod-
+
+      - name: Run acceptance tests
+        env:
+          # The moon task falls back to the pinned tofu when this is unset; each
+          # matrix leg names its binary so the two runs differ only in the CLI.
+          TF_ACC_TERRAFORM_PATH: ${{ steps.cli.outputs.path }}
+        run: moon run root:testacc
