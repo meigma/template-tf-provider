@@ -76,4 +76,12 @@ jobs:
           # The moon task falls back to the pinned tofu when this is unset; each
           # matrix leg names its binary so the two runs differ only in the CLI.
           TF_ACC_TERRAFORM_PATH: ${{ steps.cli.outputs.path }}
+          # moon drops every `runInCI: false` task whenever CI is set in the
+          # environment, and that filter applies to an explicit `moon run
+          # <target>` too, not just to `moon ci`. GitHub Actions always sets
+          # CI=true, so without this the step fails with "No tasks found" and
+          # the acceptance tests never execute. Clearing it says what is
+          # actually true here: this workflow is a human pressing a button, not
+          # the automated pipeline `runInCI: false` exists to stay out of.
+          CI: ''
         run: moon run root:testacc

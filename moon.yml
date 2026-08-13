@@ -82,14 +82,26 @@ tasks:
   # automation (`runInCI: false`, and no `check` dependency), so the only ways
   # in are `moon run root:testacc` and the manually dispatched testacc workflow.
   #
+  # `runInCI: false` bites harder than it reads: moon filters the task out
+  # whenever CI is set in the environment, and it does that for an explicit
+  # `moon run root:testacc` too, not only for `moon ci`. A run under CI=true
+  # therefore fails with "No tasks found" rather than skipping quietly. That is
+  # why the testacc workflow clears CI for its test step, and why a developer
+  # who exports CI locally has to do the same.
+  #
   # terraform-plugin-testing picks its CLI from TF_ACC_TERRAFORM_PATH, and it
   # never discovers OpenTofu on its own: left unset it looks for a binary named
   # `terraform` and downloads one when it finds none. A task `env` block cannot
   # shell out, so the default is resolved in the script instead — an inherited
   # TF_ACC_TERRAFORM_PATH wins, and otherwise the mise-pinned `tofu` already on
   # PATH is used.
+  #
+  # `-count=1` defeats Go's test cache. Without it a second run of an unchanged
+  # tree reports PASS from cache without starting a CLI at all, which is the
+  # wrong answer for a suite whose whole purpose is fresh evidence that the
+  # provider still drives real plan / apply / destroy cycles.
   testacc:
-    script: 'TF_ACC_TERRAFORM_PATH="${TF_ACC_TERRAFORM_PATH:-$(command -v tofu)}" go test ./internal/provider/ -run TestAcc -v -timeout 30m'
+    script: 'TF_ACC_TERRAFORM_PATH="${TF_ACC_TERRAFORM_PATH:-$(command -v tofu)}" go test ./internal/provider/ -run TestAcc -v -count=1 -timeout 30m'
     env:
       TF_ACC: '1'
     inputs:
