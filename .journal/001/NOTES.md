@@ -33,3 +33,6 @@ Created implementation worktree feat/provider-skeleton (.wt/feat-provider-skelet
 
 ## 2026-08-12 17:38 — Phase 1 implemented, PR #6 open
 Opus subagent completed the conversion; I reviewed the full diff, re-ran root:check (7/7 green) and plugin smoke tests myself. Two review fixes applied: release-please-config (stale melange/apko extra-files + package name — would have broken next release PR) and a moon.yml comment inaccuracy. Committed as feat/provider-skeleton, PR #6 opened (squash target). Notables: agent caught GoReleaser formats:binary clobbering trap in asset staging (fixed with artifacts.json-path staging + 9-asset assertion); pre-existing local proto/mise Go conflict breaks moon runs outside CI (workaround: PROTO_HOME to empty dir; fix separately). attest.yml dead container inputs deferred to Phase 5. Framework v1.19.0, protocol 6.
+
+## 2026-08-12 17:52 — PR #6 all checks green
+Kusari flagged two reachable transitive CVEs from terraform-plugin-framework (grpc v1.79.2 critical CVE-2026-33186 + GO-2026-6061; x/net v0.48.0 high CVE-2026-39821). Subagent pinned grpc v1.83.0 and x/net v0.58.0 via MVS (x/sys, x/text, genproto/rpc moved forward as side effects); I reviewed, committed (deps:), pushed. PR #6 now: ci pass, Kusari pass, Pages pass, dry-run skip-as-designed. Awaiting user review/squash-merge before Phase 2.
