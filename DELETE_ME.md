@@ -212,9 +212,17 @@ the key registration and the one-time listing in each registry, end to end.
 
 ### 6. Reset the release state and enable verifiable builds
 
-- Empty `CHANGELOG.md` and set `.release-please-manifest.json` back to
-  `{".": "0.0.0"}`. Both carry the template's release history, which is not
-  yours.
+- Truncate `CHANGELOG.md` to an empty file and set
+  `.release-please-manifest.json` back to `{".": "0.0.0"}`. Both carry the
+  template's release history, which is not yours. Leave the file genuinely
+  empty: Release Please writes its own `# Changelog` header, and a heading you
+  leave behind is demoted to a stray `## Changelog` under the first entry.
+- `0.0.0` is Release Please's "never released" sentinel, not a version it will
+  bump from. With no matching tag it ignores the manifest entirely and cuts the
+  first release at `initial-version` in `release-please-config.json`, which this
+  template sets to `0.1.0`. Change that if a generated provider should start
+  somewhere else; the `bump-*-pre-major` settings only take effect from the
+  second release onward.
 - Turn on `gomod.proxy` in `.goreleaser.yaml` once the module path matches the
   repository's real public URL. The comment above `builds:` explains why it is
   off in the template and what to check when you enable it.
